@@ -22,7 +22,7 @@ bin/%.o: src/%.c
 
 bin/%.d: src/%.c
 	@set -e; rm -f $@; \
-    $(CC) -MM $(CPPFLAGS) $< > $@.$$$$; \
+	$(CC) -MM $(CPPFLAGS) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,bin/\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
