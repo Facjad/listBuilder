@@ -54,7 +54,7 @@ void printMini(struct mini * mini){
 void printMinies(struct mini * mini, int size){
     for (int i = 0; i < size; i++){
         printMini(mini+i);
-        printf(" ");
+        printf("\n");
     }
-    printf("\n");
+    //printf("\n");
 }

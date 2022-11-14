@@ -1,6 +1,14 @@
 Warscroll;Points;Unique;Leader;Battleline;Behemoth;Artillery;Artefact;Triumph;Allied Unit;Endless Spell or Invocation
+a;65;;;;;;;;;
+b;21;1;;;;;;;;1
+c;6678;;1;;;;;;;
+d;365;;;1;;;;;;
+e;1221;;;;1;;;;;
+f;45;;;;;1;;;;
+g;6;;;;;;1;;;
+h;41;;;;;;;1;;
 Guttripaz;160;;;1;;;;;;
 Hobgrot Slittaz;80;;;;;;;;;
 Killaboss with Stab-Grot;110;;1;;;;;;;
 Test;;;;;no;yes;12;;;
-Extremely long unit name that should hopefully rise a bug for me to debug that sh*t because I am afraid I did not allocate enough memory but weirdly enough it seemed to work so I should really look into it…;;;;;;;;;;
+Extremely long unit name that should hopefully rise a bug for me to debug that sh*t because I am afraid I did not allocate enough memory but weirdly enough it seemed to work so I should really look into it…;;;;1;;;;;;

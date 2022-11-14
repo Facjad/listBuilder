@@ -14,7 +14,7 @@ int readRulesFile(char * fileName, int points, struct rules * rules);
 /* Opens a csv file and reads the minies it contains. Allocates memory.
 fileName : name of the csv file (without the ".csv") TODO : add the possibility to precise ".csv"
 minies : a pointer that after execution will contain the list of minies (its a pointer to a list of struct mini)
-Returns: -1 if file could not be opened. The number of found minies if the file could be opened (0 if the file does not contain any mini)
+Returns -1 if file could not be opened, or -2 if file could be opened but a field was not readable. Else, the number of found minies is returned (0 if the file does not contain any mini)
 */
 int readMiniesFile(char * fileName, struct mini ** minies);
 

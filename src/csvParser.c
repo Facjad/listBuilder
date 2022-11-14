@@ -4,47 +4,70 @@
 #include <stdbool.h>
 #include "csvParser.h"
 
-#define MAX_LINE_SIZE 100 // Enough to read first line, should be enough for any line
-#define MAX_CELL_SIZE 10 // Enough to read one cell. "999999999" takes 10 characters, I doubt any cell will contain TODO : wait, what ??
+//#define MAX_LINE_SIZE 100 // Enough to read first line, should be enough for any line
+#define MAX_CELL_SIZE 50 // Enough to read one cell. "999999999" takes 10 characters, I doubt any cell will contain TODO : wait, what ??
 
 #define START_SIZE 10 // Starting size of a list of minies
 
-/* Returns static string containing next cell
-Similar to strtok: subsequent calls on the same line should be done with str == NULL.
+/* Reads the next cell in the file. After returning from this function, the next available character is the first chracter of the next cell, or 
+the new line character if there is none.
+   This function ensures the pointer in the file remains on the same line. To go to next line, use skipLine.
+   Returns a static string containing that next cell, or NULL if no cell is left on current line. (note NULL -> no cell left ; "" -> empty cell found)
 */
-char * readNextCell(char * str){
-    static char strToParse[MAX_LINE_SIZE];
-    static int strIndex;
+char * readNextCell(FILE * csvFile){
     static char cell[MAX_CELL_SIZE]; // Value to return.
-    int cellIndex;
+    int cellIndex = 0;
+    int nextChar = fgetc(csvFile);
 
-    // Initialise values (some only if new str is provided)
-    cellIndex = 0;
-    if (str != NULL){
-        strncpy(strToParse, str, MAX_LINE_SIZE);
-        strIndex = 0;
-    }
-
-    // Parse next cell
-    if (strToParse[strIndex] == '\0') {
+    // Special cases
+    if (nextChar == '\n'){
+        ungetc('\n', csvFile); // Avoid moving to the next line
+        return NULL;
+    } else if (nextChar == EOF) {
         return NULL;
     }
 
-    for ( ; strToParse[strIndex] != ';' && strToParse[strIndex] != '\0' && strIndex < MAX_LINE_SIZE && cellIndex < MAX_CELL_SIZE-1; strIndex++, cellIndex++){
-        cell[cellIndex] = strToParse[strIndex];
+    // Parse next cell
+    for ( ; nextChar != ';' && nextChar != '\n' && nextChar != EOF ; nextChar = fgetc(csvFile)){
+        if(cellIndex < MAX_CELL_SIZE-1) {
+            cell[cellIndex] = nextChar;
+            cellIndex++;
+        }
     }
     cell[cellIndex] = '\0';
-    strIndex++;
+
+    if (nextChar == '\n'){
+        ungetc('\n', csvFile); // Avoid moving to the next line
+    }
+    
     return cell;
 }
 
-/* Returns the integer from a cell, or -1 if cell is empty
+/* Skip line, and returns a static string containing the beginning of some eventual remaining content in the line.
+Returns NULL if no content was remaining.*/
+char * skipLine(FILE * csvFile){
+    char * nextCell = readNextCell(csvFile);
+    while(fgetc(csvFile) != '\n'); // Skip remaining of line
+    return nextCell;
+}
+
+/* Returns the integer from a cell, or valueIfEmpty if cell is empty
 */
-int cellContent(char* cell){
-    if (cell[0] == '\0') {
-        return -1 ;
+int parseIntCell(char* cell, int valueIfEmpty){
+    if (cell == NULL || cell[0] == '\0') {
+        return valueIfEmpty ;
     } else {
         return atoi(cell) ;
+    }
+}
+
+/* Returns false if cell is empty (NULL or "") or is either "no" or "0". Otherwise, defaults to true.
+*/
+bool parseYesNoCell(char* cell){
+    if (cell == NULL || strcmp(cell, "no") == 0 || strcmp(cell, "0") == 0 || strcmp(cell, "") == 0) {
+        return false;
+    } else {
+        return true;
     }
 }
 
@@ -63,40 +86,46 @@ int readRulesFile(char * fileName, int points, struct rules * rules){
       return -1;
     }
 
-    char buffer[MAX_LINE_SIZE];
     char * cell;
 
     // Find right line
+    skipLine(rulesFile);
     bool lineFound = false;
-    while(fgetc(rulesFile) != '\n'); //Skip first line
     while (!lineFound){
-        if (fgets(buffer, MAX_LINE_SIZE, rulesFile) == NULL){
+        cell = readNextCell(rulesFile);
+        if (cell == NULL){
             return -2;
         }
-        cell = readNextCell(buffer);
 
         int pointsOfLine = atoi(cell);
         if (pointsOfLine == points){
             lineFound = true;
             rules->points = points;
+        } else {
+            skipLine(rulesFile);
         }
     }
 
     // Parse found line
-    cell = readNextCell(NULL);
-    rules->maxLeader = cellContent(cell);
-    cell = readNextCell(NULL);
-    rules->minBattleline = cellContent(cell);
-    cell = readNextCell(NULL);
-    rules->maxBehemoth = cellContent(cell);
-    cell = readNextCell(NULL);
-    rules->maxArtillery = cellContent(cell);
-    cell = readNextCell(NULL);
-    rules->maxArtefact = cellContent(cell);
-    cell = readNextCell(NULL);
-    rules->maxTriumph = cellContent(cell);
-    cell = readNextCell(NULL);
-    rules->maxSpell = cellContent(cell);
+    cell = readNextCell(rulesFile);
+    rules->maxLeader = parseIntCell(cell, -1);
+    cell = readNextCell(rulesFile);
+    rules->minBattleline = parseIntCell(cell, 0);
+    cell = readNextCell(rulesFile);
+    rules->maxBehemoth = parseIntCell(cell, -1);
+    cell = readNextCell(rulesFile);
+    rules->maxArtillery = parseIntCell(cell, -1);
+    cell = readNextCell(rulesFile);
+    rules->maxArtefact = parseIntCell(cell, -1);
+    cell = readNextCell(rulesFile);
+    rules->maxTriumph = parseIntCell(cell, -1);
+    cell = readNextCell(rulesFile);
+    rules->maxSpell = parseIntCell(cell, -1);
+
+    cell = skipLine(rulesFile);
+    if (cell != NULL){
+        printf("Warning : some content has been ignored, starting with %s", cell);
+    }
 
     fclose(rulesFile);
 
@@ -109,33 +138,62 @@ int readMiniesFile(char * fileName, struct mini ** minies){
     strcat(strcpy(fileNameWithCsv, fileName), ".csv");
 
     // Open file
-    FILE * rulesFile = fopen(fileNameWithCsv, "r");
-    if (rulesFile == NULL) {
+    FILE * miniesFile = fopen(fileNameWithCsv, "r");
+    if (miniesFile == NULL) {
       return -1;
     }
 
-    char buffer[MAX_LINE_SIZE];
     char * cell;
     int currentSize = START_SIZE;
     * minies = (struct mini *) malloc(sizeof(struct mini)*currentSize);
     int foundMinies = 0;
 
-    while(fgetc(rulesFile) != '\n'); //Skip first line
-    for (foundMinies = 0; fgets(buffer, MAX_LINE_SIZE, rulesFile) != NULL; foundMinies++){
-        printf("%d\n", foundMinies);
+    skipLine(miniesFile);
+    for (foundMinies = 0, cell = readNextCell(miniesFile) ; cell != NULL ; foundMinies++, cell = readNextCell(miniesFile)){
         if (foundMinies >= currentSize){
             currentSize *=2;
             * minies = (struct mini *) realloc(* minies, sizeof(struct mini)*currentSize);
         }
-        cell = readNextCell(buffer);
+
+        // Warscroll
+        // NB : First cell has already been read (see declaration of this for loop)
         (* minies)[foundMinies].warscroll = (char *) malloc((strlen(cell)+1)*sizeof(char));
         strcpy((* minies)[foundMinies].warscroll, cell);
-        cell = readNextCell(NULL);
-        (* minies)[foundMinies].points = cellContent(cell);
-        cell = readNextCell(NULL);
-        //if (strcmp(cell, )){
-            
-        //}
+        // Points
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].points = parseIntCell(cell, 0);
+        // Unique
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].unique = parseYesNoCell(cell);
+        // Leader
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].leader = parseYesNoCell(cell);
+        //Battleline
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].battleline = parseYesNoCell(cell);
+        // Behemoth
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].behemoth = parseYesNoCell(cell);
+        // Artillery
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].artillery = parseYesNoCell(cell);
+        // Artefact
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].artefact = parseYesNoCell(cell);
+        // Triumph
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].triumph = parseYesNoCell(cell);
+        // Allied
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].allied = parseYesNoCell(cell);
+        // Spell
+        cell = readNextCell(miniesFile);
+        (* minies)[foundMinies].spell = parseYesNoCell(cell);
+
+        cell = skipLine(miniesFile);
+        if (cell != NULL){
+            printf("Warning : some content has been ignored, starting with %s", cell);
+        }
     }
 
     * minies = (struct mini *) realloc(* minies, sizeof(struct mini)*foundMinies);
